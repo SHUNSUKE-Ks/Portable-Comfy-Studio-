@@ -1,0 +1,33 @@
+# ============================================================
+# D:\ai リポジトリ .gitignore
+# 方針: 設計・ツール・BAT等の「テキスト層」だけを追跡する。
+#       巨大バイナリ(venv/models/custom_nodes)・生成物は追跡しない。
+# ============================================================
+
+# === ComfyUI 本体（巨大: venv数万ファイル / models GB級 / custom_nodesは各自gitリポ）===
+/ComfyUI/
+
+# === バックアップ・旧ファイル置き場 ===
+/Archive/
+
+# === Claude のローカル設定・メモリ ===
+/.claude/
+
+# === 生成物・ログ・一時ファイル ===
+**/test_logs/
+**/output/
+**/temp/
+**/*_console.txt
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# === OS / エディタ ===
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp

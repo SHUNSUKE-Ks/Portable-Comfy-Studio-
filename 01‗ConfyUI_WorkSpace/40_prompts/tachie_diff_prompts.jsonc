@@ -1,0 +1,107 @@
+{
+  // =========================================================================
+  //  立ち絵・差分 プロンプト集（再利用ライブラリ / JSONC）
+  //  対応agent: ../20_agents/tachie_diff/tachie_diff.agent.jsonc
+  //  人間向け手順: ../10_manual/02_立ち絵差分agent運用手順書.md
+  //
+  //  設計方針:
+  //   ・プロンプトを「組み合わせ可能なブロック」に分解（品質/ネガ/表情/ポーズ/背景）。
+  //   ・最終プロンプト = base(キャラ) + expression + pose + framing + extra + quality。
+  //   ・★現時点で engine が実行に使う正データは character_variations.json。
+  //     本ファイルは「編集・拡張・閲覧の作業用カタログ」。値を変えたら
+  //     character_variations.json にも反映する（フェーズ3で一本化予定）。
+  //   ・status: "stable"=実績あり / "draft"=未検証の拡張候補（本番前にテスト推奨）
+  // =========================================================================
+  "schema_version": "1.0",
+  "kind": "prompt_library",
+  "id": "tachie_diff_prompts",
+  "updated": "2026-05-30",
+  "source_of_truth_for_engine": "D:\\ai\\ComfyUI\\user\\default\\workflows\\archive\\character_variations.json",
+
+  // --- 共通：品質タグ / ネガティブ ------------------------------------------
+  "common": {
+    "quality_tags": "high quality, masterpiece, official art style, clean lineart, anime style",
+    "global_negative": "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, worst quality, low quality, jpeg artifacts, signature, watermark, username, blurry, nsfw, 3d, realistic, multiple girls, 2girls",
+    // greenback時のみ足すネガ（背景を緑単色に固定するため）
+    "greenback_extra_positive": "green background, chroma key green, solid green background, #00FF00",
+    "greenback_extra_negative": "background details, gradient background, colored background except green, textured background, scenic background, indoor background, outdoor background"
+  },
+
+  // --- 最終プロンプト組み立てテンプレート -----------------------------------
+  "compose_template": {
+    "greenback": "{base}, {expression}, {pose}, upper body, {greenback_extra_positive}, {quality_tags}",
+    "cg":        "{base}, {expression}, {pose}, upper body in scene, ({background}:1.2), looking at viewer, {quality_tags}"
+  },
+
+  // --- キャラ base_prompt（character_variations.json と同期） ----------------
+  "characters": {
+    "heroineA": { "label": "サクラ", "base": "1girl, long brown hair, brown eyes, school uniform, white blouse, navy skirt", "note": "元気・明るい系", "status": "stable" },
+    "heroineB": { "label": "レイ",   "base": "1girl, short black hair, blue eyes, sailor uniform, white and blue",          "note": "クール・知的系", "status": "stable" },
+    "heroineC": { "label": "ミル",   "base": "1girl, twin tails, pink hair, green eyes, casual clothes, hoodie",            "note": "天然・ほんわか系", "status": "stable" }
+  },
+
+  // --- 表情ブロック（18種 / character_variations.json と同期） ---------------
+  "expressions": {
+    "normal":      { "label": "通常",       "prompt": "neutral expression, calm, relaxed", "status": "stable" },
+    "smile":       { "label": "微笑み",     "prompt": "gentle smile, soft expression, warm", "status": "stable" },
+    "happy":       { "label": "笑顔",       "prompt": "big smile, happy, cheerful, laughing, eyes closed in joy", "status": "stable" },
+    "shy":         { "label": "照れ",       "prompt": "blushing, shy expression, embarrassed, hand on cheek", "status": "stable" },
+    "angry":       { "label": "怒り",       "prompt": "angry expression, furrowed brows, pouting, cheeks puffed", "status": "stable" },
+    "sad":         { "label": "悲しみ",     "prompt": "sad expression, downcast eyes, sorrowful, looking down", "status": "stable" },
+    "crying":      { "label": "泣き",       "prompt": "crying, tears falling, teary eyes, sobbing, emotional", "status": "stable" },
+    "surprised":   { "label": "驚き",       "prompt": "surprised expression, wide eyes, open mouth, shocked, gasping", "status": "stable" },
+    "embarrassed": { "label": "恥ずかし",   "prompt": "deeply blushing, embarrassed, flustered, steam from head", "status": "stable" },
+    "determined":  { "label": "決意",       "prompt": "determined expression, confident, strong gaze, resolute", "status": "stable" },
+    "worried":     { "label": "不安",       "prompt": "worried expression, anxious, biting lip, furrowed brows slightly", "status": "stable" },
+    "sleepy":      { "label": "眠い",       "prompt": "sleepy expression, droopy eyes, yawning, tired", "status": "stable" },
+    "smirk":       { "label": "ニヤリ",     "prompt": "smirk, playful grin, mischievous, one eye closed winking", "status": "stable" },
+    "lovestruck":  { "label": "恋心",       "prompt": "heart eyes, lovestruck, dreamy expression, floating hearts, smitten", "status": "stable" },
+    "shocked":     { "label": "衝撃",       "prompt": "extremely shocked, pale face, jaw drop, speechless, frozen", "status": "stable" },
+    "joyful":      { "label": "大喜び",     "prompt": "overjoyed, ecstatic, pumping fist, huge smile, sparkling eyes", "status": "stable" },
+    "pout":        { "label": "ふくれっ面", "prompt": "pouting, sulking, arms crossed slightly, unhappy but cute", "status": "stable" },
+    "thinking":    { "label": "考え中",     "prompt": "thinking, finger on chin, contemplating, looking up", "status": "stable" }
+    // 拡張候補(draft)を足す場合はここに status:"draft" で追記し、本番前にテスト。
+  },
+
+  // --- ポーズブロック（16種 / character_variations.json と同期） -------------
+  "poses": {
+    "stand_front":    { "label": "正面立ち",   "prompt": "standing, facing forward, arms at sides, full upper body", "framing": "upper body", "status": "stable" },
+    "stand_natural":  { "label": "自然立ち",   "prompt": "standing, natural pose, slight weight shift, relaxed posture", "framing": "upper body", "status": "stable" },
+    "arms_behind":    { "label": "手を後ろ",   "prompt": "standing, hands behind back, leaning slightly forward, playful", "framing": "upper body", "status": "stable" },
+    "arms_crossed":   { "label": "腕組み",     "prompt": "standing, arms crossed, confident posture", "framing": "upper body", "status": "stable" },
+    "hand_hip":       { "label": "腰に手",     "prompt": "standing, one hand on hip, other hand free, confident", "framing": "upper body", "status": "stable" },
+    "waving":         { "label": "手を振る",   "prompt": "waving hand, greeting, one hand raised and waving", "framing": "upper body", "status": "stable" },
+    "pointing":       { "label": "指差し",     "prompt": "pointing forward, one finger extended toward viewer", "framing": "upper body", "status": "stable" },
+    "both_hands_up":  { "label": "両手上げ",   "prompt": "both arms raised, excited pose, hands up", "framing": "upper body", "status": "stable" },
+    "peace_sign":     { "label": "ピース",     "prompt": "making peace sign with fingers, cheerful, one hand raised", "framing": "upper body", "status": "stable" },
+    "head_tilt":      { "label": "首かしげ",   "prompt": "head tilted to side, curious, one hand near chin", "framing": "upper body", "status": "stable" },
+    "shy_fidget":     { "label": "もじもじ",   "prompt": "fidgeting, index fingers touching, nervous gesture, looking sideways", "framing": "upper body", "status": "stable" },
+    "covering_mouth": { "label": "口に手",     "prompt": "one hand covering mouth, surprised or giggling gesture", "framing": "upper body", "status": "stable" },
+    "sitting_desk":   { "label": "机に座る",   "prompt": "sitting, desk in front, elbows on desk, chin on hands", "framing": "upper body, desk", "status": "stable" },
+    "looking_away":   { "label": "振り返り",   "prompt": "standing, slightly turned away, glancing back over shoulder, 3/4 view", "framing": "upper body", "status": "stable" },
+    "clapping":       { "label": "拍手",       "prompt": "clapping hands together, pleased gesture", "framing": "upper body", "status": "stable" },
+    "praying":        { "label": "お願い",     "prompt": "hands pressed together in prayer or pleading, imploring", "framing": "upper body", "status": "stable" }
+  },
+
+  // --- CG背景ブロック（8種 / character_variations.json と同期） --------------
+  "backgrounds_for_cg": {
+    "school_class":   { "label": "教室",       "prompt": "anime background, japanese high school classroom, daytime, desks and chairs, chalkboard, window with sunlight", "status": "stable" },
+    "school_roof":    { "label": "屋上",       "prompt": "anime background, school rooftop, daytime, blue sky, clouds, fence, city view", "status": "stable" },
+    "room_day":       { "label": "自室（昼）", "prompt": "anime background, japanese bedroom, daytime, sunlight through window, desk, bookshelf, cozy", "status": "stable" },
+    "room_night":     { "label": "自室（夜）", "prompt": "anime background, japanese bedroom, nighttime, lamp light, warm atmosphere", "status": "stable" },
+    "street_evening": { "label": "夕方の街",   "prompt": "anime background, japanese town street, evening, golden hour, sunset, shopping street", "status": "stable" },
+    "park_spring":    { "label": "公園（春）", "prompt": "anime background, park, spring, cherry blossom trees, bench, blue sky", "status": "stable" },
+    "cafe":           { "label": "カフェ",     "prompt": "anime background, cozy cafe interior, warm lighting, wooden tables, window view", "status": "stable" },
+    "library":        { "label": "図書室",     "prompt": "anime background, school library, bookshelves, reading tables, soft light", "status": "stable" }
+  },
+
+  // --- 優先組み合わせ（表情×ポーズ 25組） -----------------------------------
+  "priority_pairs": [
+    ["normal","stand_front"], ["smile","stand_natural"], ["happy","waving"], ["happy","both_hands_up"],
+    ["shy","shy_fidget"], ["shy","arms_behind"], ["angry","arms_crossed"], ["angry","hand_hip"],
+    ["sad","stand_front"], ["crying","covering_mouth"], ["surprised","stand_front"], ["shocked","both_hands_up"],
+    ["embarrassed","head_tilt"], ["determined","pointing"], ["lovestruck","head_tilt"], ["smirk","hand_hip"],
+    ["thinking","head_tilt"], ["joyful","peace_sign"], ["worried","stand_natural"], ["pout","arms_crossed"],
+    ["sleepy","sitting_desk"], ["normal","looking_away"], ["smile","waving"], ["happy","clapping"], ["shy","praying"]
+  ]
+}

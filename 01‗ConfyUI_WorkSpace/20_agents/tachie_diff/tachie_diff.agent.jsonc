@@ -1,0 +1,123 @@
+{
+  // =========================================================================
+  //  立ち絵・差分 agent 定義（AI向け / JSONC）
+  //  人間向け仕様: ../../10_manual/02_立ち絵差分agent運用手順書.md
+  //  役割: キャラ参照画像1枚から、表情・ポーズ違いの立ち絵差分を一括生成する専門担当。
+  //  土台: 既存の generate_variants.py + character_variations.json を実行本体に使う。
+  // =========================================================================
+  "schema_version": "1.0",
+  "kind": "style_agent",
+  "id": "tachie_diff",
+  "name": "立ち絵・差分agent",
+  "updated": "2026-05-30",
+  "managed_by": "comfyui_manager",
+
+  // --- このagentが対応できること -------------------------------------------
+  "capabilities": {
+    "modes": {
+      "greenback": "緑背景の立ち絵差分（後で背景除去して使う）。差分量産の基本",
+      "cg": "背景込みの一枚絵（教室/屋上などシーン合成）"
+    },
+    "varies_by": ["expression", "pose", "background(cgのみ)"],
+    "method": "i2i", // 参照画像をもとに生成
+    "single_character_per_job": true // 1ジョブ=1キャラ
+  },
+
+  // --- 入力契約（Managerやスクリプトから渡される値の型） ---------------------
+  // required を満たさない依頼は実行しない（Managerが補完 or reject）。
+  "input_contract": {
+    "required": {
+      "image":  { "type": "path",   "desc": "キャラ参照画像のパス" },
+      "char":   { "type": "string", "desc": "キャラID。char_definitions.characters に存在すること" }
+    },
+    "optional": {
+      "mode":   { "type": "enum", "values": ["greenback", "cg"], "default": "greenback" },
+      "expr":   { "type": "string[]", "desc": "表情キーで絞り込み。未指定=全/優先に従う" },
+      "pose":   { "type": "string[]", "desc": "ポーズキーで絞り込み" },
+      "bg":     { "type": "string", "desc": "cgモード時の背景キー。未指定=全背景" },
+      "priority_only": { "type": "bool", "default": false, "desc": "優先25組のみ" },
+      "dry_run": { "type": "bool", "default": false, "desc": "生成せず件数/ファイル名のみ" }
+    },
+    "validation": [
+      { "check": "image パスが存在する", "on_fail": "stop_and_request_path" },
+      { "check": "char が定義に存在する", "on_fail": "reject_unknown_char" },
+      { "check": "expr/pose が定義済みキー", "on_fail": "skip_item_and_warn" },
+      { "check": "ComfyUI(api_url)が応答する", "on_fail": "stop_and_guide_bat" }
+    ]
+  },
+
+  // --- 実行本体（このagentが回す道具） --------------------------------------
+  "engine": {
+    "type": "comfyui_api_script",
+    "script": "D:\\ai\\ComfyUI\\user\\default\\workflows\\archive\\generate_variants.py",
+    "variations_def": "D:\\ai\\ComfyUI\\user\\default\\workflows\\archive\\character_variations.json",
+    "api_url": "http://127.0.0.1:8188",
+    "venv_python": "D:\\ai\\ComfyUI\\venv\\Scripts\\python.exe",
+    "note": "フェーズ2.5でこの2ファイルを ../../50_batch/ へ整理移設予定。移設後はパスを更新する。",
+    // Managerが組み立てるCLI例（テンプレート）
+    "cli_template": "{venv_python} {script} --image {image} --char {char} --mode {mode} [--expr ...] [--pose ...] [--bg ...] [--priority-only] [--dry-run]"
+  },
+
+  // --- 定義データの参照（実体は character_variations.json）-------------------
+  // ここでは「キーの一覧」だけ持ち、本文プロンプトは variations_def を正とする。
+  "char_definitions": {
+    "source": "engine.variations_def",
+    "known_characters": ["heroineA(サクラ)", "heroineB(レイ)", "heroineC(ミル)"],
+    "expression_keys": [
+      "normal","smile","happy","shy","angry","sad","crying","surprised",
+      "embarrassed","determined","worried","sleepy","smirk","lovestruck",
+      "shocked","joyful","pout","thinking"
+    ], // 18種
+    "pose_keys": [
+      "stand_front","stand_natural","arms_behind","arms_crossed","hand_hip",
+      "waving","pointing","both_hands_up","peace_sign","head_tilt","shy_fidget",
+      "covering_mouth","sitting_desk","looking_away","clapping","praying"
+    ], // 16種
+    "cg_background_keys": [
+      "school_class","school_roof","room_day","room_night",
+      "street_evening","park_spring","cafe","library"
+    ], // 8種
+    "priority_pairs_count": 25
+  },
+
+  // --- 生成設定（character_variations.json の generation_settings に準拠） ---
+  "generation_settings_ref": {
+    "greenback": { "width": 800, "height": 1200, "steps": 28, "cfg": 7,
+                   "sampler": "euler_ancestral", "scheduler": "karras", "denoise_i2i": 0.55 },
+    "cg":        { "width": 1920, "height": 1080, "steps": 35, "cfg": 7,
+                   "sampler": "dpmpp_2m", "scheduler": "karras", "denoise_i2i": 0.5 },
+    "note": "正となる値は variations_def 側。ここは早見表。変更時は両方更新しないこと（variations_defを正に一本化推奨）。"
+  },
+
+  // --- 出力 -----------------------------------------------------------------
+  "output": {
+    "root": "D:\\ai\\ComfyUI\\output\\galge",
+    "greenback_dir": "output/galge/greenback/{char}_{expr}_{pose}_####.png",
+    "cg_dir": "output/galge/cg/{char}_{expr}_{pose}_{bg}_####.png"
+  },
+
+  // --- 標準手順（agentが踏む順） --------------------------------------------
+  "procedure": [
+    "1. ComfyUI起動確認（api_url応答）",
+    "2. 入力契約を検証（image/char必須、expr/poseは定義照合）",
+    "3. ドライラン実行（dry_run=true で件数とファイル名を提示）",
+    "4. 人間/Manager承認を取得",
+    "5. 本実行（CLI組み立て→生成）",
+    "6. 成功/失敗件数と出力先を報告"
+  ],
+
+  // --- 既知の制約・注意（フェーズ2時点） ------------------------------------
+  "known_limitations": [
+    "seedは現状固定（同条件で同じ絵）。バリエーション増やすにはseed可変化が必要",
+    "transformers 5.0.0 環境ではノードによりエラーの可能性（環境レポート§4）",
+    "本生成はGPU機推奨。このCPU機は試作/確認用",
+    "1ジョブ1キャラ。複数キャラは複数ジョブに分割"
+  ],
+
+  // --- 今後の拡張余地 -------------------------------------------------------
+  "todo_next": [
+    "seed可変オプションの追加",
+    "engineの2ファイルを 50_batch/ へ整理移設しパス更新",
+    "expr/poseの定義を 60_external_request/schemas の許可値と同期"
+  ]
+}
