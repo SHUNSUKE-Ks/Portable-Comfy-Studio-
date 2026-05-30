@@ -1,54 +1,44 @@
 @echo off
-chcp 65001 >nul
-title ComfyUI CPU TEST (検証のみ・画像生成なし)
+title Portable Comfy Studio - CPU TEST (validate only, no image)
+set PYTHONDONTWRITEBYTECODE=1
+set PYTHONUTF8=1
+set PYTHONIOENCODING=utf-8
 
-echo ============================================================
-echo  [CPU TEST MODE] ComfyUI 検証 ... 画像生成なし / 負荷ゼロ志向
-echo ============================================================
+set "COMFY_DIR=%~dp0ComfyUI"
 
-:: ---- パス設定 ----
-set "COMFY_DIR=D:\ai\ComfyUI"
-set "WORKSPACE=D:\ai\01‗ConfyUI_WorkSpace"
+rem Workspace folder name contains a special char; find it via wildcard to keep this BAT pure-ASCII
+set "WORKSPACE="
+for /d %%D in ("%~dp001*ConfyUI_WorkSpace") do set "WORKSPACE=%%D"
+if not defined WORKSPACE (
+    echo [ERROR] workspace folder not found under %~dp0
+    pause
+    exit /b 1
+)
+
 set "VALIDATOR=%WORKSPACE%\50_batch\tools\comfyui_test_validate.py"
 set "WORKFLOW_DIR=%COMFY_DIR%\user\default\workflows"
 set "LOG_DIR=%WORKSPACE%\Report\test_logs"
 
-:: ComfyUI内に __pycache__ を作らない（フォルダを汚さない）
-set PYTHONDONTWRITEBYTECODE=1
-:: 出力をUTF-8に（パスの特殊文字対策）
-set PYTHONUTF8=1
-set PYTHONIOENCODING=utf-8
-
-:: ---- venv 確認 ----
 if not exist "%COMFY_DIR%\venv\Scripts\activate.bat" (
-    echo [ERROR] venv が見つかりません: %COMFY_DIR%\venv
-    echo         先に venv セットアップを確認してください。
+    echo [ERROR] venv not found: %COMFY_DIR%\venv
     pause
     exit /b 1
 )
 call "%COMFY_DIR%\venv\Scripts\activate.bat"
 
-:: ---- 検証スクリプト確認 ----
 if not exist "%VALIDATOR%" (
-    echo [ERROR] 検証スクリプトが見つかりません: %VALIDATOR%
+    echo [ERROR] validator not found: %VALIDATOR%
     pause
     exit /b 1
 )
 
-:: ---- ログフォルダ作成 ----
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
-:: ---- 検証実行 ----
+echo Running validation (no image generation)...
 python "%VALIDATOR%" --comfy-dir "%COMFY_DIR%" --workflow-dir "%WORKFLOW_DIR%" --log-dir "%LOG_DIR%" --mode CPU_TEST
 set "RC=%ERRORLEVEL%"
 
 echo.
-echo ------------------------------------------------------------
-if "%RC%"=="0" (
-    echo  検証 OK ^(status: success/warning^)
-) else (
-    echo  検証 NG ^(status: error^) -- 上のサマリと JSON ログを確認
-)
-echo  ログ出力先: %LOG_DIR%
-echo ------------------------------------------------------------
+if "%RC%"=="0" (echo Validation OK) else (echo Validation reported errors - see JSON log)
+echo Logs: %LOG_DIR%
 pause
